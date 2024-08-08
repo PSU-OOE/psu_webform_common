@@ -1,0 +1,7 @@
+name: 'PSU Webform (common base functionality)'
+type: module
+description: 'Shared PSU specific enhancements to webform.'
+core_version_requirement: ^10.3 || ^11
+package: Custom
+dependencies:
+  - drupal:webform

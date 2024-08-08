@@ -1,0 +1,5 @@
+{
+  "name": "psu-ooe/psu_webform_common",
+  "description": "Shared PSU specific enhancements to webform.",
+  "type": "drupal-module"
+}

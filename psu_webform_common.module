@@ -1,0 +1,140 @@
+<?php
+
+/**
+ * @file
+ * Common webform hooks.
+ */
+
+use Drupal\Component\Utility\Html;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\psu_webform_common\SelectOtherCallbacks;
+
+/**
+ * Implements hook_webform_submission_form_alter().
+ */
+function psu_webform_common_webform_submission_form_alter(&$form, FormStateInterface $form_state): void {
+
+  /** @var \Drupal\webform\WebformSubmissionForm $webform_submission_form */
+  $webform_submission_form = $form_state->getFormObject();
+  $webform = $webform_submission_form->getWebform();
+
+  $display_wizard_progress = (
+    $webform->getSetting('wizard_progress_bar') ||
+    $webform->getSetting('wizard_progress_pages') ||
+    $webform->getSetting('wizard_progress_percentage')
+  );
+
+  if ($display_wizard_progress) {
+    // We display the required indicator in the progress template, so we have to
+    // remove it from the form where it's normally added.
+    unset($form['required']);
+  }
+  else {
+    // Otherwise, wrap it in a form-item, as it's part of the form.
+    $form['required']['#prefix'] = '<div class="form-item">';
+    $form['required']['#suffix'] = '</div>';
+  }
+}
+
+/**
+ * Implements hook_form__FORM_ID_alter() for webform_settings_form.
+ */
+function psu_webform_common_form_webform_settings_form_form_alter(&$form): void {
+  // We use the clientside validation module, as such the use of clientside
+  // validation is forced (for accessibility reasons).  Therefore, prevent
+  // editors from attempting to disable any of this.
+  unset(
+    $form['form_behaviors']['form_novalidate'],
+    $form['form_behaviors']['form_disable_inline_errors']
+  );
+}
+
+/**
+ * Implements hook_webform_element_configuration_form_alter().
+ *
+ * Webform ships with some inherently inaccessible and/or broken features, so
+ * we turn off the ones we don't want form builders to choose.
+ */
+function psu_webform_common_webform_element_configuration_form_alter(array &$form): void {
+
+  unset(
+    // There isn't a case where not display a label at all is desirable. A
+    // label should always at least be present, but visually hidden if
+    // absolutely necessary.
+    $form['form']['display_container']['title_display']['#options']['none'],
+
+    // We have no use cases for inline titles; in fact they are undesirable.
+    $form['form']['display_container']['title_display']['#options']['inline'],
+
+    // Displaying the description as a tooltip may not be accessible for hybrid
+    // mouse / keyboard users in all cases.
+    $form['form']['display_container']['description_display']['#options']['tooltip'],
+
+    // Displaying the help bubble before the label or before the element is
+    // undesirable from a design perspective, so let's not allow form builders
+    // to select those options.
+    $form['form']['display_container']['help_display']['#options']['title_before'],
+    $form['form']['display_container']['help_display']['#options']['element_before'],
+
+    // Native controls are a much better UX than this jquery thing.
+    $form['time']['timepicker'],
+
+    // Certain datetime features don't appear to work properly.
+    // @todo File a Webform issue.
+    $form['date']['date_date_element']['#options']['datetime'],
+    $form['date']['date_date_element']['#options']['datetime-local'],
+    $form['date']['date_date_element']['#options']['text'],
+    $form['date']['date_date_element']['#options']['none'],
+
+    $form['time']['date_time_element']['#options']['timepicker'],
+    $form['time']['date_time_element']['#options']['text'],
+    $form['time']['date_time_element']['#options']['none'],
+
+    // The size and shape of terms of service content can be wildly
+    // unpredictable. Modals are highly preferred as they offer a
+    // very stable and distraction-free user experience.
+    $form['terms_of_service']['terms_type']['#options']['slideout'],
+  );
+}
+
+/**
+ * Implements hook_webform_element_alter().
+ */
+function psu_webform_common_webform_element_alter(array &$element): void {
+  if (isset($element['#type'])) {
+    $type = Html::getClass($element['#type']);
+    $element['#attached']['library'][] = "ooe/webform-element-$type";
+
+    // The inline form error for the select other element type must render
+    // adjacent to the select element, not the fieldset. This is because the
+    // focus ring has to wrap both the select and error.
+    if ($element['#type'] === 'webform_select_other') {
+      $element['#pre_render'][] = [SelectOtherCallbacks::class, 'preRender'];
+    }
+  }
+
+  if (isset($element['#counter_type'])) {
+    $element['#attached']['library'][] = 'ooe/webform-element-text-counter';
+  }
+
+  if (!empty($element['#description'])) {
+    $element['#attached']['library'][] = 'ooe/webform-element-description';
+  }
+
+  if (isset($element['#options_display'])) {
+    $display = match($element['#options_display']) {
+      'buttons', 'buttons_horizontal', 'buttons_vertical' => 'buttons',
+      default => 'columns',
+    };
+    $element['#attached']['library'][] = 'ooe/webform-options-display-' . $display;
+  }
+}
+
+/**
+ * Implements hook_webform_element_alter() for tel.
+ */
+function psu_webform_common_webform_element_tel_alter(array &$element): void {
+  if (isset($element['#international']) && $element['#international'] === TRUE) {
+    $element['#attached']['library'][] = 'ooe/webform-element-intl-tel';
+  }
+}
